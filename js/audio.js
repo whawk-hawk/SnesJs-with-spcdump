@@ -96,6 +96,8 @@ function AudioHandler() {
     }
   }
 
+  this.processCallCount = 0;
+
   this.process = function(e) {
     if(this.inputReadPos + 2048 > this.inputBufferPos) {
       // we overran the buffer
@@ -109,10 +111,18 @@ function AudioHandler() {
     }
     let outputL = e.outputBuffer.getChannelData(0);
     let outputR = e.outputBuffer.getChannelData(1);
+    let maxAbs = 0;
     for(let i = 0; i < 2048; i++) {
       outputL[i] = this.inputBufferL[this.inputReadPos & 0xfff];
       outputR[i] = this.inputBufferR[this.inputReadPos & 0xfff];
+      if(Math.abs(outputL[i]) > maxAbs) maxAbs = Math.abs(outputL[i]);
+      if(Math.abs(outputR[i]) > maxAbs) maxAbs = Math.abs(outputR[i]);
       this.inputReadPos++;
+    }
+    this.processCallCount++;
+    // 約2秒に1回、実際に生成されている音量(振幅)をログに出す
+    if(this.processCallCount % 50 === 0) {
+      log("process() max amplitude (last block): " + maxAbs.toFixed(4) + " / inputBufferPos: " + this.inputBufferPos);
     }
   }
 
