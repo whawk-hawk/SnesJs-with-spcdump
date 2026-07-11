@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audio Test</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 40px; }
+    button { font-size: 24px; padding: 20px 40px; }
+    #log { text-align: left; font-family: monospace; white-space: pre-wrap; margin-top: 20px; border: 1px solid #ccc; padding: 10px; min-height: 100px; }
+  </style>
+</head>
+<body>
+  <h1>音声テスト</h1>
+  <button id="beep">ピーっと鳴らす</button>
+  <div id="log"></div>
+
+  <script>
+    let logEl = document.getElementById("log");
+    function log(msg) {
+      logEl.textContent += msg + "\n";
+    }
+
+    let Ac = window.AudioContext || window.webkitAudioContext;
+    let actx = new Ac();
+    log("AudioContext state: " + actx.state + ", sampleRate: " + actx.sampleRate);
+
+    document.getElementById("beep").onclick = function() {
+      actx.resume().then(function() {
+        log("resume state: " + actx.state);
+
+        let osc = actx.createOscillator();
+        let gain = actx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = 440; // ラの音
+        gain.gain.value = 0.5;
+        osc.connect(gain);
+        gain.connect(actx.destination);
+
+        osc.start();
+        log("oscillator started at " + actx.currentTime);
+        osc.stop(actx.currentTime + 1); // 1秒間鳴らす
+
+        osc.onended = function() {
+          log("oscillator ended");
+        };
+      }).catch(function(err) {
+        log("resume error: " + err);
+      });
+    };
+  </script>
+</body>
+</html>
