@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <title>SnesJS</title>
+</head>
+<body>
+  <input id="rom" type="file">
+  <input id="ishirom" type="checkbox"> HiROM
+  <button id="pause">Pause</button>
+  <button id="reset">Reset</button>
+  <button id="hardreset">Power cycle</button>
+  <button id="runframe">Run 1 frame</button>
+  <button id="dumpspc">Dump SPC</button><br>
+  <canvas id="output"></canvas>
+
+  <div id="touch-controls">
+    <div class="tc-row">
+      <div class="tc-dpad">
+        <button class="tc-btn tc-up"    data-pad="4">▲</button>
+        <button class="tc-btn tc-left"  data-pad="6">◀</button>
+        <button class="tc-btn tc-right" data-pad="7">▶</button>
+        <button class="tc-btn tc-down"  data-pad="5">▼</button>
+      </div>
+      <div class="tc-abxy">
+        <button class="tc-btn tc-y" data-pad="1">Y</button>
+        <button class="tc-btn tc-x" data-pad="9">X</button>
+        <button class="tc-btn tc-b" data-pad="0">B</button>
+        <button class="tc-btn tc-a" data-pad="8">A</button>
+      </div>
+    </div>
+    <div class="tc-row tc-shoulders">
+      <button class="tc-btn tc-l" data-pad="10">L</button>
+      <button class="tc-btn tc-select" data-pad="2">SELECT</button>
+      <button class="tc-btn tc-start"  data-pad="3">START</button>
+      <button class="tc-btn tc-r" data-pad="11">R</button>
+    </div>
+  </div>
+
+  <pre id="log"></pre>
+  <p>
+    SnesJs, by angelo_wf. <a href="spcplayer.html">SpcJs</a>.<br>
+    Source on <a href="https://github.com/angelo-wf/SnesJs">Github</a>.
+  </p>
+
+  <script src="lib/zip.js"></script>
+  <script src="lib/inflate.js"></script>
+
+  <script src="snes/cart.js"></script>
+  <script src="snes/dsp.js"></script>
+  <script src="snes/spc.js"></script>
+  <script src="snes/apu.js"></script>
+  <script src="snes/pipu.js"></script>
+  <script src="snes/cpu.js"></script>
+  <script src="snes/snes.js"></script>
+
+  <script src="js/audio.js"></script>
+  <script src="js/trace.js"></script>
+  <script src="js/spcdump.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/touchcontrols.js"></script>
+
+</body>
+</html>
