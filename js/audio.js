@@ -44,7 +44,8 @@ function AudioHandler() {
   this.unlock = function() {
     // iOS Safari対策: ユーザー操作の中で実際に無音バッファを1回再生することで
     // AudioContextの出力ロックを解除する(resume()だけでは不十分なため)
-    if(this.hasAudio && !this.unlocked) {
+    // state が running になるまでは、操作のたびに毎回リトライする
+    if(this.hasAudio && this.actx.state !== "running") {
       try {
         log("unlock() called, state before: " + this.actx.state);
         let buffer = this.actx.createBuffer(1, 1, 22050);
@@ -61,7 +62,6 @@ function AudioHandler() {
         }).catch(function(err) {
           log("resume() error: " + err);
         });
-        this.unlocked = true;
       } catch(err) {
         log("unlock() error: " + err);
       }
