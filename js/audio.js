@@ -13,12 +13,16 @@ function AudioHandler() {
   } else {
     this.actx = new Ac();
 
+    this.actx.onstatechange = function() {
+      log("AudioContext state changed: " + audioHandlerRef.actx.state);
+    };
+
     let samples = this.actx.sampleRate / 60;
     this.sampleBufferL = new Float64Array(samples);
     this.sampleBufferR = new Float64Array(samples);
     this.samplesPerFrame = samples;
 
-    log("Audio initialized, sample rate: " + this.actx.sampleRate);
+    log("Audio initialized, sample rate: " + this.actx.sampleRate + ", initial state: " + this.actx.state);
 
     this.inputBufferL = new Float64Array(4096);
     this.inputBufferR = new Float64Array(4096);
@@ -27,6 +31,8 @@ function AudioHandler() {
 
     this.scriptNode = undefined;
   }
+
+  let audioHandlerRef = this;
 
   this.resume = function() {
     // for Chrome autoplay policy
@@ -39,31 +45,43 @@ function AudioHandler() {
     // iOS Safari対策: ユーザー操作の中で実際に無音バッファを1回再生することで
     // AudioContextの出力ロックを解除する(resume()だけでは不十分なため)
     if(this.hasAudio && !this.unlocked) {
-      let buffer = this.actx.createBuffer(1, 1, 22050);
-      let source = this.actx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(this.actx.destination);
-      if(source.start) {
-        source.start(0);
-      } else {
-        source.noteOn(0);
+      try {
+        log("unlock() called, state before: " + this.actx.state);
+        let buffer = this.actx.createBuffer(1, 1, 22050);
+        let source = this.actx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(this.actx.destination);
+        if(source.start) {
+          source.start(0);
+        } else {
+          source.noteOn(0);
+        }
+        this.actx.resume().then(function() {
+          log("resume() promise resolved, state now: " + audioHandlerRef.actx.state);
+        }).catch(function(err) {
+          log("resume() error: " + err);
+        });
+        this.unlocked = true;
+      } catch(err) {
+        log("unlock() error: " + err);
       }
-      this.actx.resume();
-      this.unlocked = true;
     }
   }
 
   this.start = function() {
     if(this.hasAudio) {
+      try {
+        this.scriptNode = this.actx.createScriptProcessor(2048, 0, 2);
+        let that = this;
+        this.scriptNode.onaudioprocess = function(e) {
+          that.process(e);
+        }
 
-      this.scriptNode = this.actx.createScriptProcessor(2048, 0, 2);
-      let that = this;
-      this.scriptNode.onaudioprocess = function(e) {
-        that.process(e);
+        this.scriptNode.connect(this.actx.destination);
+        log("Audio scriptNode connected, state: " + this.actx.state);
+      } catch(err) {
+        log("start() error: " + err);
       }
-
-      this.scriptNode.connect(this.actx.destination);
-
     }
   }
 
