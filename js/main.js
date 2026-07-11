@@ -38,8 +38,8 @@ let controlsP1 = {
 }
 
 el("rom").onchange = function(e) {
-  // ユーザー操作(ファイル選択)の中でresumeすることでSafari等の自動再生制限を解除する
-  audioHandler.resume();
+  // ユーザー操作(ファイル選択)の中でunlockすることでiOS Safari等の自動再生制限を解除する
+  audioHandler.unlock();
   let freader = new FileReader();
   freader.onload = function() {
     let buf = freader.result;
@@ -119,6 +119,24 @@ el("runframe").onclick = function(e) {
 el("dumpspc").onclick = function(e) {
   if(loaded) {
     downloadSpc(snes, "dump.spc");
+  }
+}
+
+el("fullscreen").onclick = function(e) {
+  let container = el("game-container");
+  if(!document.fullscreenElement) {
+    if(container.requestFullscreen) {
+      container.requestFullscreen();
+    } else if(container.webkitRequestFullscreen) {
+      // iOS Safariでの互換用(iOSはcanvas/div全体の全画面に対応していない場合がある)
+      container.webkitRequestFullscreen();
+    }
+  } else {
+    if(document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if(document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
   }
 }
 

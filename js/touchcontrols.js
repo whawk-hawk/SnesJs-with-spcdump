@@ -9,9 +9,9 @@
 
     let press = function(e) {
       e.preventDefault();
-      // Safari/iOSの自動再生制限解除にも使う(ユーザー操作の中でresumeを呼ぶ)
+      // Safari/iOSの自動再生制限解除にも使う(ユーザー操作の中でunlockを呼ぶ)
       if(audioHandler && audioHandler.hasAudio) {
-        audioHandler.resume();
+        audioHandler.unlock();
       }
       if(loaded) {
         snes.setPad1ButtonPressed(padNum);
@@ -36,10 +36,10 @@
     btn.addEventListener("mouseleave", release);
   });
 
-  // 画面のどこかを最初にタップした時点でAudioContextを再開させる保険
+  // 画面のどこかを最初にタップした時点でAudioContextのロックを解除する保険
   document.addEventListener("touchstart", function() {
     if(audioHandler && audioHandler.hasAudio) {
-      audioHandler.resume();
+      audioHandler.unlock();
     }
   }, { passive: true });
 })();

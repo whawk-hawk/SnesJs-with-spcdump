@@ -35,6 +35,24 @@ function AudioHandler() {
     }
   }
 
+  this.unlock = function() {
+    // iOS Safari対策: ユーザー操作の中で実際に無音バッファを1回再生することで
+    // AudioContextの出力ロックを解除する(resume()だけでは不十分なため)
+    if(this.hasAudio && !this.unlocked) {
+      let buffer = this.actx.createBuffer(1, 1, 22050);
+      let source = this.actx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.actx.destination);
+      if(source.start) {
+        source.start(0);
+      } else {
+        source.noteOn(0);
+      }
+      this.actx.resume();
+      this.unlocked = true;
+    }
+  }
+
   this.start = function() {
     if(this.hasAudio) {
 

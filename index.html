@@ -1,6 +1,9 @@
 <!doctype html>
 <html>
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <link rel="stylesheet" type="text/css" href="style.css">
   <title>SnesJS</title>
 </head>
@@ -11,29 +14,33 @@
   <button id="reset">Reset</button>
   <button id="hardreset">Power cycle</button>
   <button id="runframe">Run 1 frame</button>
-  <button id="dumpspc">Dump SPC</button><br>
-  <canvas id="output"></canvas>
+  <button id="dumpspc">Dump SPC</button>
+  <button id="fullscreen">全画面</button><br>
 
-  <div id="touch-controls">
-    <div class="tc-row">
-      <div class="tc-dpad">
-        <button class="tc-btn tc-up"    data-pad="4">▲</button>
-        <button class="tc-btn tc-left"  data-pad="6">◀</button>
-        <button class="tc-btn tc-right" data-pad="7">▶</button>
-        <button class="tc-btn tc-down"  data-pad="5">▼</button>
+  <div id="game-container">
+    <canvas id="output"></canvas>
+
+    <div id="touch-controls">
+      <div class="tc-row">
+        <div class="tc-dpad">
+          <button class="tc-btn tc-up"    data-pad="4">▲</button>
+          <button class="tc-btn tc-left"  data-pad="6">◀</button>
+          <button class="tc-btn tc-right" data-pad="7">▶</button>
+          <button class="tc-btn tc-down"  data-pad="5">▼</button>
+        </div>
+        <div class="tc-abxy">
+          <button class="tc-btn tc-y" data-pad="1">Y</button>
+          <button class="tc-btn tc-x" data-pad="9">X</button>
+          <button class="tc-btn tc-b" data-pad="0">B</button>
+          <button class="tc-btn tc-a" data-pad="8">A</button>
+        </div>
       </div>
-      <div class="tc-abxy">
-        <button class="tc-btn tc-y" data-pad="1">Y</button>
-        <button class="tc-btn tc-x" data-pad="9">X</button>
-        <button class="tc-btn tc-b" data-pad="0">B</button>
-        <button class="tc-btn tc-a" data-pad="8">A</button>
+      <div class="tc-row tc-shoulders">
+        <button class="tc-btn tc-l" data-pad="10">L</button>
+        <button class="tc-btn tc-select" data-pad="2">SELECT</button>
+        <button class="tc-btn tc-start"  data-pad="3">START</button>
+        <button class="tc-btn tc-r" data-pad="11">R</button>
       </div>
-    </div>
-    <div class="tc-row tc-shoulders">
-      <button class="tc-btn tc-l" data-pad="10">L</button>
-      <button class="tc-btn tc-select" data-pad="2">SELECT</button>
-      <button class="tc-btn tc-start"  data-pad="3">START</button>
-      <button class="tc-btn tc-r" data-pad="11">R</button>
     </div>
   </div>
 
