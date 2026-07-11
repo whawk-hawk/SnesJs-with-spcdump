@@ -100,16 +100,38 @@ pre {
   pointer-events: auto;
 }
 
+/* 全画面時のみ、L→SELECT→十字キー(左側)・R→START→ABXY(右側)の縦並びにする。
+   .tc-shouldersはdisplay:contentsでレイアウトから外し、中のボタンを個別に
+   position:absoluteで配置する(通常表示時のレイアウトには影響しない)。 */
 #game-container.fullscreen-mode .tc-shoulders {
-  position: absolute;
-  top: calc(56px + env(safe-area-inset-top));
-  left: calc(16px + env(safe-area-inset-left));
-  right: calc(16px + env(safe-area-inset-right));
-  justify-content: space-between;
-  pointer-events: none;
+  display: contents;
 }
 
-#game-container.fullscreen-mode .tc-shoulders .tc-btn {
+#game-container.fullscreen-mode .tc-l {
+  position: absolute;
+  left: calc(16px + env(safe-area-inset-left));
+  top: calc(16px + env(safe-area-inset-top));
+  pointer-events: auto;
+}
+
+#game-container.fullscreen-mode .tc-select {
+  position: absolute;
+  left: calc(16px + env(safe-area-inset-left));
+  top: calc(64px + env(safe-area-inset-top));
+  pointer-events: auto;
+}
+
+#game-container.fullscreen-mode .tc-r {
+  position: absolute;
+  right: calc(16px + env(safe-area-inset-right));
+  top: calc(16px + env(safe-area-inset-top));
+  pointer-events: auto;
+}
+
+#game-container.fullscreen-mode .tc-start {
+  position: absolute;
+  right: calc(16px + env(safe-area-inset-right));
+  top: calc(64px + env(safe-area-inset-top));
   pointer-events: auto;
 }
 
@@ -185,12 +207,21 @@ pre {
   position: relative;
   width: 150px;
   height: 150px;
+  touch-action: none;
+  cursor: pointer;
 }
 
+/* 十字キーの見た目のボタンは表示専用(押下判定はtc-dpadエリア全体で行う)。
+   タッチ/クリックがボタンではなくtc-dpad自体に届くようにする。 */
 .tc-dpad .tc-btn {
   position: absolute;
   width: 50px;
   height: 50px;
+  pointer-events: none;
+}
+
+.tc-dpad .tc-btn.tc-active {
+  background-color: #888;
 }
 
 .tc-up    { top: 0;    left: 50px; }
@@ -211,10 +242,10 @@ pre {
   border-radius: 50%;
 }
 
-.tc-y { top: 0;    left: 50px; }
-.tc-a { top: 100px; left: 50px; }
-.tc-b { top: 50px; left: 100px; }
-.tc-x { top: 50px; left: 0; }
+.tc-x { top: 0;    left: 50px; }
+.tc-b { top: 100px; left: 50px; }
+.tc-a { top: 50px; left: 100px; }
+.tc-y { top: 50px; left: 0; }
 
 .tc-shoulders {
   justify-content: center;
