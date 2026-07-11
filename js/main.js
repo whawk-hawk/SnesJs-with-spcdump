@@ -11,6 +11,8 @@ let paused = false;
 let pausedInBg = false;
 
 let romArr = new Uint8Array([]);
+let romBaseName = "dump"; // 現在読み込み中のROMのファイル名(拡張子なし)
+let romDumpCounter = 0;   // 同じROMを読み込んでいる間、Dump SPCのたびに増える連番
 
 let snes = new Snes();
 
@@ -57,6 +59,8 @@ el("rom").onchange = function(e) {
               }
               found = true;
               log("Loaded \"" + name + "\" from zip");
+              romBaseName = name.replace(/\.[^./\\]+$/, "");
+              romDumpCounter = 0;
               entries[i].getData(new zip.BlobWriter(), function(blob) {
                 let breader = new FileReader();
                 breader.onload = function() {
@@ -81,6 +85,8 @@ el("rom").onchange = function(e) {
       });
     } else {
       // load rom normally
+      romBaseName = e.target.files[0].name.replace(/\.[^./\\]+$/, "");
+      romDumpCounter = 0;
       romArr = new Uint8Array(buf);
       loadRom(romArr);
     }
@@ -116,29 +122,66 @@ el("runframe").onclick = function(e) {
   }
 }
 
-el("dumpspc").onclick = function(e) {
+function doDumpSpc() {
   if(loaded) {
-    downloadSpc(snes, "dump.spc");
+    romDumpCounter++;
+    let num = String(romDumpCounter).padStart(2, "0");
+    downloadSpc(snes, romBaseName + "_" + num + ".spc");
   }
 }
 
-el("fullscreen").onclick = function(e) {
-  let container = el("game-container");
-  if(!document.fullscreenElement) {
-    if(container.requestFullscreen) {
-      container.requestFullscreen();
-    } else if(container.webkitRequestFullscreen) {
-      // iOS Safariでの互換用(iOSはcanvas/div全体の全画面に対応していない場合がある)
-      container.webkitRequestFullscreen();
-    }
-  } else {
-    if(document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if(document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    }
-  }
+el("dumpspc").onclick = doDumpSpc;
+el("fs-dumpspc-btn").onclick = doDumpSpc;
+
+// 疑似フルスクリーン方式(PC/iPhone共通)
+// iOS SafariはFullscreen APIに対応していないため、requestFullscreen()には頼らず、
+// position:fixedのオーバーレイ(.fullscreen-modeクラス)で画面全体を覆う。
+let fullscreenActive = false;
+
+// window.visualViewportの実測高さを--vvhとしてCSS変数に反映し続ける。
+// Safariのアドレスバー増減による揺れを避けるため、100vhではなくこちらを優先して使う。
+function updateViewportHeightVar() {
+  let h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  document.documentElement.style.setProperty("--vvh", h + "px");
 }
+updateViewportHeightVar();
+if(window.visualViewport) {
+  window.visualViewport.addEventListener("resize", updateViewportHeightVar);
+  window.visualViewport.addEventListener("scroll", updateViewportHeightVar);
+}
+
+function toggleFullscreenMode() {
+  fullscreenActive = !fullscreenActive;
+  let container = el("game-container");
+  container.classList.toggle("fullscreen-mode", fullscreenActive);
+  if(fullscreenActive) {
+    updateViewportHeightVar();
+  }
+  el("fullscreen").textContent = fullscreenActive ? "全画面解除" : "全画面";
+}
+
+el("fullscreen").onclick = toggleFullscreenMode;
+el("fs-close-btn").onclick = toggleFullscreenMode;
+
+// 画面回転対応:縦画面で全画面に入ったあと横に回転すると、iOS Safariで
+// タッチ領域がずれることがあるため、fullscreen-modeクラスを一旦外して
+// 次フレームで付け直し、レイアウトを強制的に再構築する
+function handleFullscreenOrientationChange() {
+  updateViewportHeightVar();
+  setTimeout(updateViewportHeightVar, 150);
+  if(!fullscreenActive) {
+    return;
+  }
+  let container = el("game-container");
+  container.classList.remove("fullscreen-mode");
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      container.classList.add("fullscreen-mode");
+    });
+  });
+}
+
+window.addEventListener("orientationchange", handleFullscreenOrientationChange);
 
 el("ishirom").onchange = function(e) {
   if(loaded) {
