@@ -1,7 +1,11 @@
-
 function Dsp(apu) {
 
   this.apu = apu;
+
+  // イントロ抽出用: 「無音状態から次に最初のKON(キーオン)が来た瞬間」に
+  // 自動でSPCダンプを行うための待機フラグ。UI側(main.js)からtrueにする。
+  // resetでは(ゲーム再起動をまたいでも待機状態を維持したいので)クリアしない。
+  this.autoDumpArmed = false;
 
   this.ram = new Uint8Array(0x80);
 
@@ -419,6 +423,15 @@ function Dsp(apu) {
         break; // TODO (echo volume R)
       }
       case 0x4c: {
+        // イントロ自動抽出: 待機中に最初のKON書き込み(いずれかのチャンネルで
+        // value & test > 0)が来た、その瞬間のAPU状態をSPCとしてダンプする。
+        // ここで状態(prevFlags/decodeOffset/gain/adsrState等)を更新する前に
+        // 判定するが、実際のダンプは下のループで状態を更新した後、この
+        // case文を抜けてから行う(そのため一旦フラグだけ立てる)。
+        let shouldAutoDump = this.autoDumpArmed && value !== 0;
+        if(shouldAutoDump) {
+          this.autoDumpArmed = false;
+        }
         let test = 1;
         for(let i = 0; i < 8; i++) {
           if((value & test) > 0) {
@@ -439,6 +452,17 @@ function Dsp(apu) {
             }
           }
           test <<= 1;
+        }
+        if(shouldAutoDump) {
+          // ここまででこのKON書き込みによる状態更新は完了している。
+          // this.ram[adr]自体はこのswitch文を抜けた後に書き込まれるが、
+          // KONの値そのものはdumpSpc()内でapu.ram/dsp.ramを直接読むだけなので
+          // タイミング的に問題ない(手動でこの命令直後にダンプボタンを
+          // 押した場合と等価な状態になる)。
+          downloadSpc(this.apu.snes, "auto_intro_dump.spc");
+          if(typeof onAutoDumpFired === "function") {
+            onAutoDumpFired();
+          }
         }
         break;
       }
