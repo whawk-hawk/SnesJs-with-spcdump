@@ -11,21 +11,9 @@ let paused = false;
 let pausedInBg = false;
 
 let romArr = new Uint8Array([]);
-
-// ダンプファイル名生成用: 読み込んだROMの拡張子抜きファイル名と、
-// 通常ダンプ/イントロ自動ダンプそれぞれの通し番号
-let currentRomName = "rom";
-let normalDumpCount = 0;
-let introDumpCount = 0;
-
-function stripExt(name) {
-  let idx = name.lastIndexOf(".");
-  return idx > 0 ? name.slice(0, idx) : name;
-}
-
-function pad2(n) {
-  return (n < 10 ? "0" : "") + n;
-}
+let romBaseName = "dump"; // 現在読み込み中のROMのファイル名(拡張子なし)
+let romDumpCounter = 0;   // 同じROMを読み込んでいる間、Dump SPCのたびに増える連番
+let introDumpCounter = 0; // 同じROMを読み込んでいる間、イントロ自動ダンプが発火するたびに増える連番
 
 let snes = new Snes();
 
@@ -72,9 +60,9 @@ el("rom").onchange = function(e) {
               }
               found = true;
               log("Loaded \"" + name + "\" from zip");
-              currentRomName = stripExt(name);
-              normalDumpCount = 0;
-              introDumpCount = 0;
+              romBaseName = name.replace(/\.[^./\\]+$/, "");
+              romDumpCounter = 0;
+              introDumpCounter = 0;
               entries[i].getData(new zip.BlobWriter(), function(blob) {
                 let breader = new FileReader();
                 breader.onload = function() {
@@ -99,9 +87,9 @@ el("rom").onchange = function(e) {
       });
     } else {
       // load rom normally
-      currentRomName = stripExt(e.target.files[0].name);
-      normalDumpCount = 0;
-      introDumpCount = 0;
+      romBaseName = e.target.files[0].name.replace(/\.[^./\\]+$/, "");
+      romDumpCounter = 0;
+      introDumpCounter = 0;
       romArr = new Uint8Array(buf);
       loadRom(romArr);
     }
@@ -137,63 +125,116 @@ el("runframe").onclick = function(e) {
   }
 }
 
-el("dumpspc").onclick = function(e) {
+function doDumpSpc() {
   if(loaded) {
-    normalDumpCount++;
-    downloadSpc(snes, currentRomName + "_" + pad2(normalDumpCount) + ".spc");
+    romDumpCounter++;
+    let num = String(romDumpCounter).padStart(2, "0");
+    downloadSpc(snes, romBaseName + "_" + num + ".spc");
   }
 }
 
-// dsp.js側(イントロ自動ダンプ)から、発火のたびに次のファイル名を取得するために呼ばれる
-window.getNextIntroDumpFilename = function() {
-  introDumpCount++;
-  return "intro_" + currentRomName + "_" + pad2(introDumpCount) + ".spc";
+el("dumpspc").onclick = doDumpSpc;
+el("fs-dumpspc-btn").onclick = doDumpSpc;
+
+// イントロ抽出用: 「無音状態から最初にKON(キーオン)が来た瞬間」を狙って
+// 自動でSPCをダンプする機能。ツールバー側(#armdump)と全画面オーバーレイ側
+// (#fs-armdump-btn)の両方のボタンを、同じ待機状態を反映するように連動させる。
+const ARM_LABEL_IDLE = "イントロ待機";
+const ARM_LABEL_ARMED = "待機中...";
+
+function updateArmDumpButtons() {
+  let armed = snes.apu.dsp.autoDumpArmed;
+  let toolbarBtn = el("armdump");
+  let overlayBtn = el("fs-armdump-btn");
+  if(toolbarBtn) {
+    toolbarBtn.textContent = armed ? "イントロ録音待機(次のKeyOnで自動ダンプ) - " + ARM_LABEL_ARMED : "イントロ録音待機(次のKeyOnで自動ダンプ)";
+  }
+  if(overlayBtn) {
+    overlayBtn.textContent = armed ? ARM_LABEL_ARMED : ARM_LABEL_IDLE;
+    overlayBtn.classList.toggle("armed", armed);
+  }
 }
 
-const ARM_LABEL_IDLE = "イントロ録音待機(次のKeyOnで自動ダンプ)";
-const ARM_LABEL_ARMED = "待機中... (最初の発音でSPCを自動保存)";
+function toggleArmDump() {
+  if(!loaded) {
+    return;
+  }
+  snes.apu.dsp.autoDumpArmed = !snes.apu.dsp.autoDumpArmed;
+  updateArmDumpButtons();
+}
 
-// armdumpボタンがindex.html側に無い(反映漏れ)場合でも、
-// ここでエラーになって以降の初期化(全画面ボタン等)が止まらないようにする
+// ボタンがHTML側に無い(反映漏れ)場合でもエラーで後続の初期化が止まらないようにする
 let armdumpBtn = el("armdump");
 if(armdumpBtn) {
-  armdumpBtn.onclick = function(e) {
-    if(!loaded) {
-      return;
-    }
-    // トグル: 押すたびに待機ON/OFFを切り替える
-    snes.apu.dsp.autoDumpArmed = !snes.apu.dsp.autoDumpArmed;
-    armdumpBtn.textContent = snes.apu.dsp.autoDumpArmed ? ARM_LABEL_ARMED : ARM_LABEL_IDLE;
-  }
-} else {
-  log("警告: #armdump ボタンがHTMLに見つかりません。index.htmlが未反映の可能性があります。");
+  armdumpBtn.onclick = toggleArmDump;
+}
+let fsArmdumpBtn = el("fs-armdump-btn");
+if(fsArmdumpBtn) {
+  fsArmdumpBtn.onclick = toggleArmDump;
+}
+
+// dsp.js側(KON書き込み検知)から、発火のたびに次のファイル名を取得するために呼ばれる
+window.getNextIntroDumpFilename = function() {
+  introDumpCounter++;
+  let num = String(introDumpCounter).padStart(2, "0");
+  return "intro_" + romBaseName + "_" + num + ".spc";
 }
 
 // dsp.js側から、自動ダンプが実際に発火した瞬間に呼ばれる
 // (dsp.jsは古典的なグローバルスクリプトなので、windowに生やして参照する)
 window.onAutoDumpFired = function() {
-  if(armdumpBtn) {
-    armdumpBtn.textContent = ARM_LABEL_IDLE;
-  }
+  updateArmDumpButtons();
 }
 
-el("fullscreen").onclick = function(e) {
-  let container = el("game-container");
-  if(!document.fullscreenElement) {
-    if(container.requestFullscreen) {
-      container.requestFullscreen();
-    } else if(container.webkitRequestFullscreen) {
-      // iOS Safariでの互換用(iOSはcanvas/div全体の全画面に対応していない場合がある)
-      container.webkitRequestFullscreen();
-    }
-  } else {
-    if(document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if(document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    }
-  }
+// 疑似フルスクリーン方式(PC/iPhone共通)
+// iOS SafariはFullscreen APIに対応していないため、requestFullscreen()には頼らず、
+// position:fixedのオーバーレイ(.fullscreen-modeクラス)で画面全体を覆う。
+let fullscreenActive = false;
+
+// window.visualViewportの実測高さを--vvhとしてCSS変数に反映し続ける。
+// Safariのアドレスバー増減による揺れを避けるため、100vhではなくこちらを優先して使う。
+function updateViewportHeightVar() {
+  let h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  document.documentElement.style.setProperty("--vvh", h + "px");
 }
+updateViewportHeightVar();
+if(window.visualViewport) {
+  window.visualViewport.addEventListener("resize", updateViewportHeightVar);
+  window.visualViewport.addEventListener("scroll", updateViewportHeightVar);
+}
+
+function toggleFullscreenMode() {
+  fullscreenActive = !fullscreenActive;
+  let container = el("game-container");
+  container.classList.toggle("fullscreen-mode", fullscreenActive);
+  if(fullscreenActive) {
+    updateViewportHeightVar();
+  }
+  el("fullscreen").textContent = fullscreenActive ? "全画面解除" : "全画面";
+}
+
+el("fullscreen").onclick = toggleFullscreenMode;
+el("fs-close-btn").onclick = toggleFullscreenMode;
+
+// 画面回転対応:縦画面で全画面に入ったあと横に回転すると、iOS Safariで
+// タッチ領域がずれることがあるため、fullscreen-modeクラスを一旦外して
+// 次フレームで付け直し、レイアウトを強制的に再構築する
+function handleFullscreenOrientationChange() {
+  updateViewportHeightVar();
+  setTimeout(updateViewportHeightVar, 150);
+  if(!fullscreenActive) {
+    return;
+  }
+  let container = el("game-container");
+  container.classList.remove("fullscreen-mode");
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      container.classList.add("fullscreen-mode");
+    });
+  });
+}
+
+window.addEventListener("orientationchange", handleFullscreenOrientationChange);
 
 el("ishirom").onchange = function(e) {
   if(loaded) {
