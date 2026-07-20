@@ -460,7 +460,10 @@ function Dsp(apu) {
           // KONの値そのものはdumpSpc()内でapu.ram/dsp.ramを直接読むだけなので
           // タイミング的に問題ない(手動でこの命令直後にダンプボタンを
           // 押した場合と等価な状態になる)。
-          downloadSpc(this.apu.snes, "auto_intro_dump.spc");
+          let filename = (typeof getNextIntroDumpFilename === "function")
+            ? getNextIntroDumpFilename()
+            : "auto_intro_dump.spc";
+          downloadSpc(this.apu.snes, filename);
           if(typeof onAutoDumpFired === "function") {
             onAutoDumpFired();
           }

@@ -12,6 +12,21 @@ let pausedInBg = false;
 
 let romArr = new Uint8Array([]);
 
+// ダンプファイル名生成用: 読み込んだROMの拡張子抜きファイル名と、
+// 通常ダンプ/イントロ自動ダンプそれぞれの通し番号
+let currentRomName = "rom";
+let normalDumpCount = 0;
+let introDumpCount = 0;
+
+function stripExt(name) {
+  let idx = name.lastIndexOf(".");
+  return idx > 0 ? name.slice(0, idx) : name;
+}
+
+function pad2(n) {
+  return (n < 10 ? "0" : "") + n;
+}
+
 let snes = new Snes();
 
 let audioHandler = new AudioHandler();
@@ -57,6 +72,9 @@ el("rom").onchange = function(e) {
               }
               found = true;
               log("Loaded \"" + name + "\" from zip");
+              currentRomName = stripExt(name);
+              normalDumpCount = 0;
+              introDumpCount = 0;
               entries[i].getData(new zip.BlobWriter(), function(blob) {
                 let breader = new FileReader();
                 breader.onload = function() {
@@ -81,6 +99,9 @@ el("rom").onchange = function(e) {
       });
     } else {
       // load rom normally
+      currentRomName = stripExt(e.target.files[0].name);
+      normalDumpCount = 0;
+      introDumpCount = 0;
       romArr = new Uint8Array(buf);
       loadRom(romArr);
     }
@@ -118,8 +139,15 @@ el("runframe").onclick = function(e) {
 
 el("dumpspc").onclick = function(e) {
   if(loaded) {
-    downloadSpc(snes, "dump.spc");
+    normalDumpCount++;
+    downloadSpc(snes, currentRomName + "_" + pad2(normalDumpCount) + ".spc");
   }
+}
+
+// dsp.js側(イントロ自動ダンプ)から、発火のたびに次のファイル名を取得するために呼ばれる
+window.getNextIntroDumpFilename = function() {
+  introDumpCount++;
+  return "intro_" + currentRomName + "_" + pad2(introDumpCount) + ".spc";
 }
 
 const ARM_LABEL_IDLE = "イントロ録音待機(次のKeyOnで自動ダンプ)";
