@@ -97,19 +97,25 @@ el("rom").onchange = function(e) {
   freader.readAsArrayBuffer(e.target.files[0]);
 }
 
-el("pause").onclick = function() {
+function togglePause() {
   if(paused && loaded) {
     loopId = requestAnimationFrame(update);
     audioHandler.start();
     paused = false;
-    el("pause").textContent = "Pause";
   } else {
     cancelAnimationFrame(loopId);
     audioHandler.stop();
     paused = true;
-    el("pause").textContent = "Continue";
+  }
+  let label = paused ? "Continue" : "Pause";
+  el("pause").textContent = label;
+  let fsPauseBtn = el("fs-pause-btn");
+  if(fsPauseBtn) {
+    fsPauseBtn.textContent = label;
   }
 }
+
+el("pause").onclick = togglePause;
 
 el("reset").onclick = function(e) {
   snes.reset(false);
@@ -171,6 +177,11 @@ if(armdumpBtn) {
 let fsArmdumpBtn = el("fs-armdump-btn");
 if(fsArmdumpBtn) {
   fsArmdumpBtn.onclick = toggleArmDump;
+}
+
+let fsPauseBtn = el("fs-pause-btn");
+if(fsPauseBtn) {
+  fsPauseBtn.onclick = togglePause;
 }
 
 // dsp.js側(KON書き込み検知)から、発火のたびに次のファイル名を取得するために呼ばれる
