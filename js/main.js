@@ -153,19 +153,28 @@ window.getNextIntroDumpFilename = function() {
 const ARM_LABEL_IDLE = "イントロ録音待機(次のKeyOnで自動ダンプ)";
 const ARM_LABEL_ARMED = "待機中... (最初の発音でSPCを自動保存)";
 
-el("armdump").onclick = function(e) {
-  if(!loaded) {
-    return;
+// armdumpボタンがindex.html側に無い(反映漏れ)場合でも、
+// ここでエラーになって以降の初期化(全画面ボタン等)が止まらないようにする
+let armdumpBtn = el("armdump");
+if(armdumpBtn) {
+  armdumpBtn.onclick = function(e) {
+    if(!loaded) {
+      return;
+    }
+    // トグル: 押すたびに待機ON/OFFを切り替える
+    snes.apu.dsp.autoDumpArmed = !snes.apu.dsp.autoDumpArmed;
+    armdumpBtn.textContent = snes.apu.dsp.autoDumpArmed ? ARM_LABEL_ARMED : ARM_LABEL_IDLE;
   }
-  // トグル: 押すたびに待機ON/OFFを切り替える
-  snes.apu.dsp.autoDumpArmed = !snes.apu.dsp.autoDumpArmed;
-  el("armdump").textContent = snes.apu.dsp.autoDumpArmed ? ARM_LABEL_ARMED : ARM_LABEL_IDLE;
+} else {
+  log("警告: #armdump ボタンがHTMLに見つかりません。index.htmlが未反映の可能性があります。");
 }
 
 // dsp.js側から、自動ダンプが実際に発火した瞬間に呼ばれる
 // (dsp.jsは古典的なグローバルスクリプトなので、windowに生やして参照する)
 window.onAutoDumpFired = function() {
-  el("armdump").textContent = ARM_LABEL_IDLE;
+  if(armdumpBtn) {
+    armdumpBtn.textContent = ARM_LABEL_IDLE;
+  }
 }
 
 el("fullscreen").onclick = function(e) {
