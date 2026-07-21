@@ -1,4 +1,3 @@
-
 function Dsp(apu) {
 
   this.apu = apu;
@@ -7,6 +6,7 @@ function Dsp(apu) {
   // 自動でSPCダンプを行うための待機フラグ。UI側(main.js)からtrueにする。
   // resetでは(ゲーム再起動をまたいでも待機状態を維持したいので)クリアしない。
   this.autoDumpArmed = false;
+  this._pendingAutoDump = false; // KON実書き込み後にダンプを発火するための内部フラグ
 
   this.ram = new Uint8Array(0x80);
 
@@ -426,12 +426,18 @@ function Dsp(apu) {
       case 0x4c: {
         // イントロ自動抽出: 待機中に最初のKON書き込み(いずれかのチャンネルで
         // value & test > 0)が来た、その瞬間のAPU状態をSPCとしてダンプする。
-        // ここで状態(prevFlags/decodeOffset/gain/adsrState等)を更新する前に
-        // 判定するが、実際のダンプは下のループで状態を更新した後、この
-        // case文を抜けてから行う(そのため一旦フラグだけ立てる)。
+        // 【重要】ここでは判定・状態更新(prevFlags/decodeOffset/gain/adsrState等)
+        // までを行い、実際のダンプ発火(downloadSpc呼び出し)は必ず、
+        // このwrite()関数の一番最後(this.ram[adr]=valueでKONレジスタ自体が
+        // 実際にRAMへ書き込まれた"後")まで遅らせる。ここで即座にダンプすると
+        // 保存されるSPCファイルのKONレジスタが「まだ書き込まれる前の値(0)」の
+        // ままになってしまい、それを読み込んだエミュレータ側が「新規キーオンされた
+        // チャンネル」と認識できず、発音直後のエンベロープ/波形デコード初期化が
+        // 正しく行われない(結果、再生開始直後の音がズレる)というバグがあったため。
         let shouldAutoDump = this.autoDumpArmed && value !== 0;
         if(shouldAutoDump) {
           this.autoDumpArmed = false;
+          this._pendingAutoDump = true;
         }
         let test = 1;
         for(let i = 0; i < 8; i++) {
@@ -453,20 +459,6 @@ function Dsp(apu) {
             }
           }
           test <<= 1;
-        }
-        if(shouldAutoDump) {
-          // ここまででこのKON書き込みによる状態更新は完了している。
-          // this.ram[adr]自体はこのswitch文を抜けた後に書き込まれるが、
-          // KONの値そのものはdumpSpc()内でapu.ram/dsp.ramを直接読むだけなので
-          // タイミング的に問題ない(手動でこの命令直後にダンプボタンを
-          // 押した場合と等価な状態になる)。
-          let filename = (typeof getNextIntroDumpFilename === "function")
-            ? getNextIntroDumpFilename()
-            : "auto_intro_dump.spc";
-          downloadSpc(this.apu.snes, filename);
-          if(typeof onAutoDumpFired === "function") {
-            onAutoDumpFired();
-          }
         }
         break;
       }
@@ -528,6 +520,19 @@ function Dsp(apu) {
       }
     }
     this.ram[adr & 0x7f] = value;
+
+    // イントロ自動ダンプの実際の発火は必ずここ(KONレジスタが本当にRAMへ
+    // 書き込まれた直後)で行う。詳細はcase 0x4c内のコメントを参照。
+    if(this._pendingAutoDump) {
+      this._pendingAutoDump = false;
+      let filename = (typeof getNextIntroDumpFilename === "function")
+        ? getNextIntroDumpFilename()
+        : "auto_intro_dump.spc";
+      downloadSpc(this.apu.snes, filename);
+      if(typeof onAutoDumpFired === "function") {
+        onAutoDumpFired();
+      }
+    }
   }
 
 }
