@@ -16,7 +16,7 @@
 //   (ROM本体のバイナリ(data)はセーブファイルに含めない。ロード時は
 //   ユーザーが同じROMを読み込んでいる前提とし、ROM名・サイズが一致するかだけ確認する)
 
-const STATE_SAVE_VERSION = 2;
+const STATE_SAVE_VERSION = 3;
 
 // TypedArrayの中身(バイト列)をBase64文字列に変換する
 // (巨大な配列でもコールスタックを溢れさせないよう、チャンクに分けて処理する)
@@ -63,6 +63,19 @@ function ssSnapshotValue(val) {
   return val;
 }
 
+// 配列の要素に関数が含まれるかどうか
+// (cpu.js/spc.jsが持つ、オペコードごとの処理関数を並べたディスパッチテーブル
+// (this.functions)がこれに該当する。JSON.stringifyは配列内の関数を
+// 黙ってnullに変換してしまうため、保存対象から除外する必要がある)
+function ssIsFunctionArray(arr) {
+  for(let i = 0; i < arr.length; i++) {
+    if(typeof arr[i] === "function") {
+      return true;
+    }
+  }
+  return false;
+}
+
 // オブジェクトの「関数ではない自分自身のプロパティ」を、
 // excludeKeysに含まれるもの(親/兄弟モジュールへの参照など)を除いて保存する
 function ssSnapshotObject(obj, excludeKeys) {
@@ -73,6 +86,9 @@ function ssSnapshotObject(obj, excludeKeys) {
     }
     let val = obj[key];
     if(typeof val === "function") {
+      continue;
+    }
+    if(Array.isArray(val) && ssIsFunctionArray(val)) {
       continue;
     }
     out[key] = ssSnapshotValue(val);
