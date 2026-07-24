@@ -15,6 +15,8 @@ let snes = new Snes();
 
 let audioHandler = new AudioHandler();
 
+log("statesave.js version: " + STATE_SAVE_VERSION + " (v3であればファイルは最新)");
+
 let logging = false;
 let noPpu = false;
 
