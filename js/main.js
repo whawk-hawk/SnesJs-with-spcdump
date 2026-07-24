@@ -148,8 +148,12 @@ el("savestate").onclick = function(e) {
   // iOS Safari対策: ダウンロード(共有シート等)でページが一瞬バックグラウンド扱いになり
   // AudioContextが止まることがあるため、ユーザー操作の中で明示的に再開しておく
   audioHandler.resume();
-  downloadState(snes, "savestate.json");
-  log("ステートを保存しました");
+  try {
+    downloadState(snes, "savestate.json");
+    log("ステートを保存しました");
+  } catch(err) {
+    log("ステート保存中にエラーが発生しました: " + err);
+  }
 }
 
 el("loadstate").onchange = function(e) {
@@ -175,7 +179,14 @@ el("loadstate").onchange = function(e) {
       e.target.value = "";
       return;
     }
-    let result = restoreSnesState(snes, state);
+    let result;
+    try {
+      result = restoreSnesState(snes, state);
+    } catch(err) {
+      log("ステートの復元中に予期しないエラーが発生しました: " + err);
+      e.target.value = "";
+      return;
+    }
     if(result.ok) {
       log("ステートを復元しました");
     } else {
@@ -269,8 +280,16 @@ function runFrame() {
 }
 
 function update() {
-  runFrame();
-  loopId = requestAnimationFrame(update);
+  try {
+    runFrame();
+    loopId = requestAnimationFrame(update);
+  } catch(err) {
+    log("実行中にエラーが発生し、停止しました: " + err);
+    cancelAnimationFrame(loopId);
+    audioHandler.stop();
+    paused = true;
+    el("pause").textContent = "Continue";
+  }
 }
 
 window.onkeydown = function(e) {
