@@ -16,7 +16,29 @@
 //   (ROM本体のバイナリ(data)はセーブファイルに含めない。ロード時は
 //   ユーザーが同じROMを読み込んでいる前提とし、ROM名・サイズが一致するかだけ確認する)
 
-const STATE_SAVE_VERSION = 1;
+const STATE_SAVE_VERSION = 2;
+
+// TypedArrayの中身(バイト列)をBase64文字列に変換する
+// (巨大な配列でもコールスタックを溢れさせないよう、チャンクに分けて処理する)
+function ssBytesToBase64(bytes) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for(let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(
+      null, bytes.subarray(i, i + chunkSize)
+    );
+  }
+  return btoa(binary);
+}
+
+function ssBase64ToBytes(base64) {
+  let binary = atob(base64);
+  let bytes = new Uint8Array(binary.length);
+  for(let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
 
 // 値を再帰的に「保存用のプレーンな値」に変換する
 function ssSnapshotValue(val) {
@@ -25,10 +47,13 @@ function ssSnapshotValue(val) {
   }
   if(ArrayBuffer.isView(val)) {
     // TypedArray (Uint8Array, Uint16Array, Int32Array, Float64Array, ...)
-    return { __ta: val.constructor.name, d: Array.from(val) };
+    // 1要素ずつJSONの数値配列にすると非常に遅く・大きくなるため、
+    // バイト列のままBase64文字列にまとめて保存する
+    let bytes = new Uint8Array(val.buffer, val.byteOffset, val.byteLength);
+    return { __ta: val.constructor.name, b: ssBytesToBase64(bytes) };
   }
   if(Array.isArray(val)) {
-    // 通常の配列(bool/numberの配列など)
+    // 通常の配列(bool/numberの配列など、サイズが小さいのでそのままでよい)
     return val.map(ssSnapshotValue);
   }
   if(typeof val === "object") {
@@ -61,17 +86,24 @@ function ssRestoreValue(current, val) {
     return val;
   }
   if(typeof val === "object" && val.__ta) {
-    // TypedArrayを復元。既存の配列があり長さが同じならその場で書き換える
-    // (他のコードがそのTypedArrayへの参照を保持している場合があるため、
-    // 極力元の参照は保ったまま中身だけ差し替える)
-    if(current && ArrayBuffer.isView(current) && current.length === val.d.length) {
-      current.set(val.d);
+    // Base64からTypedArrayを復元
+    let bytes = ssBase64ToBytes(val.b);
+    let Ctor = window[val.__ta] || Uint8Array;
+    if(
+      current && ArrayBuffer.isView(current) &&
+      current.byteLength === bytes.byteLength
+    ) {
+      // 既存の配列があり長さが同じならその場で書き換える
+      // (他のコードがそのTypedArrayへの参照を保持している場合があるため、
+      // 極力元の参照は保ったまま中身だけ差し替える)
+      new Uint8Array(
+        current.buffer, current.byteOffset, current.byteLength
+      ).set(bytes);
       return current;
     }
-    let Ctor = window[val.__ta] || Uint8Array;
-    let arr = new Ctor(val.d.length);
-    arr.set(val.d);
-    return arr;
+    // bytes.bufferは復元用に新しく作られた、ぴったりのサイズのバッファなので
+    // そのままTypedArrayとして被せ直せる
+    return new Ctor(bytes.buffer);
   }
   if(Array.isArray(val)) {
     return val.slice();
@@ -131,6 +163,13 @@ function snapshotSnesState(snes) {
 function restoreSnesState(snes, state) {
   if(!state || typeof state !== "object") {
     return { ok: false, error: "ステートデータの形式が正しくありません" };
+  }
+  if(state.version !== STATE_SAVE_VERSION) {
+    return {
+      ok: false,
+      error: "セーブデータの形式が古い/新しいため読み込めません" +
+        "(データ: v" + state.version + ", 対応: v" + STATE_SAVE_VERSION + ")"
+    };
   }
   if(!snes.cart) {
     return { ok: false, error: "先にROMを読み込んでください" };
