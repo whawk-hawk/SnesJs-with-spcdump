@@ -16,6 +16,9 @@
   <button id="runframe">Run 1 frame</button>
   <button id="dumpspc">Dump SPC</button>
   <button id="armdump">イントロ録音待機(次のKeyOnで自動ダンプ)</button>
+  <button id="savestate">ステートセーブ</button>
+  <label for="loadstate" id="loadstatelabel" class="file-button">ステートロード</label>
+  <input id="loadstate" type="file" accept=".json" style="display:none">
   <button id="fullscreen">全画面</button><br>
 
   <div id="game-container">
@@ -43,11 +46,6 @@
         <button class="tc-btn tc-r" data-pad="11">R</button>
       </div>
     </div>
-
-    <button id="fs-close-btn" class="fs-overlay-btn">✕ 閉じる</button>
-    <button id="fs-dumpspc-btn" class="fs-overlay-btn">Dump SPC</button>
-    <button id="fs-pause-btn" class="fs-overlay-btn">Pause</button>
-    <button id="fs-armdump-btn" class="fs-overlay-btn">イントロ待機</button>
   </div>
 
   <pre id="log"></pre>
@@ -70,6 +68,7 @@
   <script src="js/audio.js"></script>
   <script src="js/trace.js"></script>
   <script src="js/spcdump.js"></script>
+  <script src="js/statesave.js"></script>
   <script src="js/main.js"></script>
   <script src="js/touchcontrols.js"></script>
 
