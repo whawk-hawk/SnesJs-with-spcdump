@@ -90,6 +90,7 @@ el("rom").onchange = function(e) {
 el("pause").onclick = function() {
   if(paused && loaded) {
     loopId = requestAnimationFrame(update);
+    audioHandler.resume();
     audioHandler.start();
     paused = false;
     el("pause").textContent = "Pause";
@@ -144,11 +145,18 @@ el("savestate").onclick = function(e) {
     log("先にROMを読み込んでください");
     return;
   }
+  // iOS Safari対策: ダウンロード(共有シート等)でページが一瞬バックグラウンド扱いになり
+  // AudioContextが止まることがあるため、ユーザー操作の中で明示的に再開しておく
+  audioHandler.resume();
   downloadState(snes, "savestate.json");
   log("ステートを保存しました");
 }
 
 el("loadstate").onchange = function(e) {
+  // iOS Safari対策: ネイティブのファイル選択画面が開くことでページが一瞬
+  // バックグラウンド扱いになり、AudioContextが止まることがあるため、
+  // ユーザー操作(このイベント)の中で明示的に再開しておく
+  audioHandler.resume();
   if(!e.target.files[0]) {
     return;
   }
