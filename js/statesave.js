@@ -152,11 +152,11 @@ function snapshotSnesState(snes) {
   let state = {
     version: STATE_SAVE_VERSION,
     snes: ssSnapshotObject(snes, ["cpu", "ppu", "apu", "cart"]),
-    cpu: ssSnapshotObject(snes.cpu, ["mem"]),
+    cpu: ssSnapshotObject(snes.cpu, ["mem", "functions"]),
     ppu: ssSnapshotObject(snes.ppu, ["snes", "pixelOutput"]),
     apu: ssSnapshotObject(snes.apu, ["snes", "spc", "dsp", "bootRom"])
   };
-  state.apu.spc = ssSnapshotObject(snes.apu.spc, ["mem"]);
+  state.apu.spc = ssSnapshotObject(snes.apu.spc, ["mem", "functions"]);
   state.apu.dsp = ssSnapshotObject(snes.apu.dsp, ["apu"]);
 
   if(snes.cart) {
@@ -206,13 +206,26 @@ function restoreSnesState(snes, state) {
   }
 
   ssRestoreObject(snes, state.snes, ["cpu", "ppu", "apu", "cart"]);
-  ssRestoreObject(snes.cpu, state.cpu, ["mem"]);
+  ssRestoreObject(snes.cpu, state.cpu, ["mem", "functions"]);
   ssRestoreObject(snes.ppu, state.ppu, ["snes", "pixelOutput"]);
   ssRestoreObject(snes.apu, state.apu, ["snes", "spc", "dsp"]);
-  ssRestoreObject(snes.apu.spc, state.apu.spc, ["mem"]);
+  ssRestoreObject(snes.apu.spc, state.apu.spc, ["mem", "functions"]);
   ssRestoreObject(snes.apu.dsp, state.apu.dsp, ["apu"]);
   if(state.cart) {
     ssRestoreObject(snes.cart, state.cart, ["data"]);
+  }
+
+  // 健全性チェック: オペコードのディスパッチテーブルが破損していないか
+  // (万が一破損していると、この後の実行で必ずクラッシュするため、
+  // ここで検知して分かりやすいエラーとして報告する)
+  if(
+    !snes.cpu.functions || typeof snes.cpu.functions[0] !== "function" ||
+    !snes.apu.spc.functions || typeof snes.apu.spc.functions[0] !== "function"
+  ) {
+    return {
+      ok: false,
+      error: "内部エラー: 命令テーブルが壊れています(統合バグの可能性、報告してください)"
+    };
   }
 
   return { ok: true };
