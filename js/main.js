@@ -1,4 +1,3 @@
-
 let c = el("output");
 c.width = 512;
 c.height = 480;
@@ -11,9 +10,6 @@ let paused = false;
 let pausedInBg = false;
 
 let romArr = new Uint8Array([]);
-let romBaseName = "dump"; // 現在読み込み中のROMのファイル名(拡張子なし)
-let romDumpCounter = 0;   // 同じROMを読み込んでいる間、Dump SPCのたびに増える連番
-let introDumpCounter = 0; // 同じROMを読み込んでいる間、イントロ自動ダンプが発火するたびに増える連番
 
 let snes = new Snes();
 
@@ -60,9 +56,6 @@ el("rom").onchange = function(e) {
               }
               found = true;
               log("Loaded \"" + name + "\" from zip");
-              romBaseName = name.replace(/\.[^./\\]+$/, "");
-              romDumpCounter = 0;
-              introDumpCounter = 0;
               entries[i].getData(new zip.BlobWriter(), function(blob) {
                 let breader = new FileReader();
                 breader.onload = function() {
@@ -87,9 +80,6 @@ el("rom").onchange = function(e) {
       });
     } else {
       // load rom normally
-      romBaseName = e.target.files[0].name.replace(/\.[^./\\]+$/, "");
-      romDumpCounter = 0;
-      introDumpCounter = 0;
       romArr = new Uint8Array(buf);
       loadRom(romArr);
     }
@@ -97,25 +87,19 @@ el("rom").onchange = function(e) {
   freader.readAsArrayBuffer(e.target.files[0]);
 }
 
-function togglePause() {
+el("pause").onclick = function() {
   if(paused && loaded) {
     loopId = requestAnimationFrame(update);
     audioHandler.start();
     paused = false;
+    el("pause").textContent = "Pause";
   } else {
     cancelAnimationFrame(loopId);
     audioHandler.stop();
     paused = true;
-  }
-  let label = paused ? "Continue" : "Pause";
-  el("pause").textContent = label;
-  let fsPauseBtn = el("fs-pause-btn");
-  if(fsPauseBtn) {
-    fsPauseBtn.textContent = label;
+    el("pause").textContent = "Continue";
   }
 }
-
-el("pause").onclick = togglePause;
 
 el("reset").onclick = function(e) {
   snes.reset(false);
@@ -131,121 +115,86 @@ el("runframe").onclick = function(e) {
   }
 }
 
-function doDumpSpc() {
+el("dumpspc").onclick = function(e) {
   if(loaded) {
-    romDumpCounter++;
-    let num = String(romDumpCounter).padStart(2, "0");
-    downloadSpc(snes, romBaseName + "_" + num + ".spc");
+    downloadSpc(snes, "dump.spc");
   }
 }
 
-el("dumpspc").onclick = doDumpSpc;
-el("fs-dumpspc-btn").onclick = doDumpSpc;
+const ARM_LABEL_IDLE = "イントロ録音待機(次のKeyOnで自動ダンプ)";
+const ARM_LABEL_ARMED = "待機中... (最初の発音でSPCを自動保存)";
 
-// イントロ抽出用: 「無音状態から最初にKON(キーオン)が来た瞬間」を狙って
-// 自動でSPCをダンプする機能。ツールバー側(#armdump)と全画面オーバーレイ側
-// (#fs-armdump-btn)の両方のボタンを、同じ待機状態を反映するように連動させる。
-const ARM_LABEL_IDLE = "イントロ待機";
-const ARM_LABEL_ARMED = "待機中...";
-
-function updateArmDumpButtons() {
-  let armed = snes.apu.dsp.autoDumpArmed;
-  let toolbarBtn = el("armdump");
-  let overlayBtn = el("fs-armdump-btn");
-  if(toolbarBtn) {
-    toolbarBtn.textContent = armed ? "イントロ録音待機(次のKeyOnで自動ダンプ) - " + ARM_LABEL_ARMED : "イントロ録音待機(次のKeyOnで自動ダンプ)";
-  }
-  if(overlayBtn) {
-    overlayBtn.textContent = armed ? ARM_LABEL_ARMED : ARM_LABEL_IDLE;
-    overlayBtn.classList.toggle("armed", armed);
-  }
-}
-
-function toggleArmDump() {
+el("armdump").onclick = function(e) {
   if(!loaded) {
     return;
   }
+  // トグル: 押すたびに待機ON/OFFを切り替える
   snes.apu.dsp.autoDumpArmed = !snes.apu.dsp.autoDumpArmed;
-  updateArmDumpButtons();
-}
-
-// ボタンがHTML側に無い(反映漏れ)場合でもエラーで後続の初期化が止まらないようにする
-let armdumpBtn = el("armdump");
-if(armdumpBtn) {
-  armdumpBtn.onclick = toggleArmDump;
-}
-let fsArmdumpBtn = el("fs-armdump-btn");
-if(fsArmdumpBtn) {
-  fsArmdumpBtn.onclick = toggleArmDump;
-}
-
-let fsPauseBtn = el("fs-pause-btn");
-if(fsPauseBtn) {
-  fsPauseBtn.onclick = togglePause;
-}
-
-// dsp.js側(KON書き込み検知)から、発火のたびに次のファイル名を取得するために呼ばれる
-window.getNextIntroDumpFilename = function() {
-  introDumpCounter++;
-  let num = String(introDumpCounter).padStart(2, "0");
-  return "intro_" + romBaseName + "_" + num + ".spc";
+  el("armdump").textContent = snes.apu.dsp.autoDumpArmed ? ARM_LABEL_ARMED : ARM_LABEL_IDLE;
 }
 
 // dsp.js側から、自動ダンプが実際に発火した瞬間に呼ばれる
 // (dsp.jsは古典的なグローバルスクリプトなので、windowに生やして参照する)
 window.onAutoDumpFired = function() {
-  updateArmDumpButtons();
+  el("armdump").textContent = ARM_LABEL_IDLE;
 }
 
-// 疑似フルスクリーン方式(PC/iPhone共通)
-// iOS SafariはFullscreen APIに対応していないため、requestFullscreen()には頼らず、
-// position:fixedのオーバーレイ(.fullscreen-modeクラス)で画面全体を覆う。
-let fullscreenActive = false;
-
-// window.visualViewportの実測高さを--vvhとしてCSS変数に反映し続ける。
-// Safariのアドレスバー増減による揺れを避けるため、100vhではなくこちらを優先して使う。
-function updateViewportHeightVar() {
-  let h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  document.documentElement.style.setProperty("--vvh", h + "px");
-}
-updateViewportHeightVar();
-if(window.visualViewport) {
-  window.visualViewport.addEventListener("resize", updateViewportHeightVar);
-  window.visualViewport.addEventListener("scroll", updateViewportHeightVar);
-}
-
-function toggleFullscreenMode() {
-  fullscreenActive = !fullscreenActive;
-  let container = el("game-container");
-  container.classList.toggle("fullscreen-mode", fullscreenActive);
-  if(fullscreenActive) {
-    updateViewportHeightVar();
-  }
-  el("fullscreen").textContent = fullscreenActive ? "全画面解除" : "全画面";
-}
-
-el("fullscreen").onclick = toggleFullscreenMode;
-el("fs-close-btn").onclick = toggleFullscreenMode;
-
-// 画面回転対応:縦画面で全画面に入ったあと横に回転すると、iOS Safariで
-// タッチ領域がずれることがあるため、fullscreen-modeクラスを一旦外して
-// 次フレームで付け直し、レイアウトを強制的に再構築する
-function handleFullscreenOrientationChange() {
-  updateViewportHeightVar();
-  setTimeout(updateViewportHeightVar, 150);
-  if(!fullscreenActive) {
+el("savestate").onclick = function(e) {
+  if(!loaded) {
+    log("先にROMを読み込んでください");
     return;
   }
-  let container = el("game-container");
-  container.classList.remove("fullscreen-mode");
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      container.classList.add("fullscreen-mode");
-    });
-  });
+  downloadState(snes, "savestate.json");
+  log("ステートを保存しました");
 }
 
-window.addEventListener("orientationchange", handleFullscreenOrientationChange);
+el("loadstate").onchange = function(e) {
+  if(!e.target.files[0]) {
+    return;
+  }
+  if(!loaded) {
+    log("先にROMを読み込んでください");
+    e.target.value = "";
+    return;
+  }
+  let freader = new FileReader();
+  freader.onload = function() {
+    let state;
+    try {
+      state = JSON.parse(freader.result);
+    } catch(err) {
+      log("ステートファイルの読み込みに失敗しました(JSONとして解釈できません)");
+      e.target.value = "";
+      return;
+    }
+    let result = restoreSnesState(snes, state);
+    if(result.ok) {
+      log("ステートを復元しました");
+    } else {
+      log("ステートの復元に失敗しました: " + result.error);
+    }
+    e.target.value = "";
+  }
+  freader.readAsText(e.target.files[0]);
+}
+
+el("fullscreen").onclick = function(e) {
+  let container = el("game-container");
+  if(!document.fullscreenElement) {
+    if(container.requestFullscreen) {
+      container.requestFullscreen();
+    } else if(container.webkitRequestFullscreen) {
+      // iOS Safariでの互換用(iOSはcanvas/div全体の全画面に対応していない場合がある)
+      container.webkitRequestFullscreen();
+    }
+  } else {
+    if(document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if(document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  }
+}
 
 el("ishirom").onchange = function(e) {
   if(loaded) {
